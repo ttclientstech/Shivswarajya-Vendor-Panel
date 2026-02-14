@@ -1,0 +1,234 @@
+.page {
+    display: flex;
+    min-height: 100vh;
+    width: 100%;
+}
+
+/* Left Side - Form */
+.formSection {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: var(--space-xl);
+    background-color: var(--bg-card);
+    position: relative;
+    max-width: 50%;
+}
+
+.contentWrapper {
+    width: 100%;
+    max-width: 440px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xl);
+    animation: fadeIn 0.5s ease-out;
+}
+
+.brandHeader {
+    margin-bottom: var(--space-lg);
+}
+
+.logoContainer {
+    width: 64px;
+    height: 64px;
+    background: linear-gradient(135deg, var(--primary) 0%, #FF8F00 100%);
+    border-radius: var(--radius-xl);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    margin-bottom: var(--space-lg);
+    box-shadow: 0 10px 25px -5px rgba(255, 107, 0, 0.4);
+}
+
+.title {
+    font-size: 2.5rem;
+    font-weight: 800;
+    line-height: 1.1;
+    color: var(--text-dark);
+    margin-bottom: var(--space-xs);
+}
+
+.subtitle {
+    font-size: 1.125rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    max-width: 90%;
+}
+
+.highlight {
+    color: var(--primary);
+}
+
+.formCard {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+}
+
+.otpInputContainer {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin: 2rem 0;
+}
+
+.otpDigit {
+    width: 3.5rem;
+    height: 4.5rem;
+    font-size: 1.75rem;
+    text-align: center;
+    border: 2px solid #E5E7EB;
+    border-radius: var(--radius-md);
+    font-weight: 700;
+    color: var(--primary);
+    background: #F9FAFB;
+    transition: all 0.2s ease;
+}
+
+.otpDigit:focus {
+    outline: none;
+    border-color: var(--primary);
+    background-color: white;
+    box-shadow: 0 0 0 4px var(--primary-light);
+}
+
+.otpInputInfo {
+    background-color: var(--primary-light);
+    color: #9A3412;
+    padding: 1rem;
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    text-align: center;
+    font-weight: 600;
+    margin-bottom: 1rem;
+}
+
+.divider {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    color: var(--text-light);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    margin: var(--space-md) 0;
+}
+
+.identityDivider {
+    color: var(--primary);
+}
+
+.identityDivider .line {
+    background-color: var(--primary);
+}
+
+.line {
+    flex: 1;
+    height: 1px;
+    background-color: #E5E7EB;
+}
+
+/* Right Side - Visuals */
+.visualSection {
+    flex: 1;
+    background-color: var(--bg-dark);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 4rem;
+    color: white;
+}
+
+.visualContent {
+    position: relative;
+    z-index: 10;
+    max-width: 600px;
+}
+
+.visualTitle {
+    font-size: 3.5rem;
+    font-weight: 800;
+    line-height: 1.1;
+    margin-bottom: 3rem;
+}
+
+.featureList {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.featureItem {
+    display: flex;
+    gap: 1.5rem;
+    align-items: flex-start;
+}
+
+.featureIcon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary);
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.featureText h3 {
+    font-size: 1.125rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+}
+
+.featureText p {
+    color: #9CA3AF;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.systemStatus {
+    position: absolute;
+    top: 2rem;
+    right: 2rem;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 0.5rem 1rem;
+    border-radius: 99px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.statusDot {
+    width: 8px;
+    height: 8px;
+    background-color: var(--success);
+    border-radius: 50%;
+    box-shadow: 0 0 10px var(--success);
+}
+
+@media (max-width: 1024px) {
+    .page {
+        flex-direction: column;
+    }
+
+    .formSection {
+        max-width: 100%;
+        min-height: 100vh;
+        padding: 2rem 1.5rem;
+    }
+
+    .visualSection {
+        display: none;
+    }
+}
