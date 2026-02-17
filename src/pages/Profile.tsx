@@ -3,6 +3,7 @@ import { Camera, Save, MapPin, Phone, Globe, Lock, Bell, Shield, Database, Layou
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { profileService, type VendorProfile } from '../services/profileService';
+import { fileUploadService } from '../services/fileUploadService';
 
 import { useAuth } from '../context/AuthContext';
 
@@ -26,9 +27,14 @@ export const Profile: React.FC = () => {
         },
         gstNumber: '',
         shopActLicenseUrl: '',
-        identityProofUrl: ''
+        identityProofUrl: '',
+        status: ''
     });
 
+    const logoInputRef = React.useRef<HTMLInputElement>(null);
+    const [uploading, setUploading] = useState<{ logo: boolean }>({ logo: false });
+
+    // ... imports 
     // We also need to store social media links separately?
     // Backend doesn't support them, so we just use the main profile data.
 
@@ -39,12 +45,15 @@ export const Profile: React.FC = () => {
     const fetchProfile = async () => {
         try {
             const profile = await profileService.getProfile();
+            console.log('Profile Data fetched:', profile);
             setFormData(profile);
             // Sync with global auth context (Header)
             updateUser({
                 businessName: profile.businessName,
                 ownerName: profile.ownerName,
-                logo: profile.logo
+                logo: profile.logo,
+                isVerified: profile.isVerified,
+                status: profile.status
             });
         } catch (error) {
             console.error('Failed to fetch profile', error);
@@ -58,6 +67,33 @@ export const Profile: React.FC = () => {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
+    const handleImageUpload = async (type: 'logo', file: File) => {
+        if (!file) return;
+
+        setUploading(prev => ({ ...prev, [type]: true }));
+        try {
+            // Import fileUploadService at top if not present, but using strict replacement here
+            // Assuming fileUploadService is imported
+            // const { fileUploadService } = await import('../services/fileUploadService');
+
+            const url = await fileUploadService.uploadFile(file);
+
+            setFormData(prev => ({
+                ...prev,
+                [type]: url
+            }));
+
+            // Optional: Auto-save or just let them click save.
+            // For better UX, we can just update the preview and let them save.
+
+        } catch (error) {
+            console.error(`Failed to upload ${type} `, error);
+            alert(`Failed to upload ${type}. Please try again.`);
+        } finally {
+            setUploading(prev => ({ ...prev, [type]: false }));
+        }
+    };
+
     const handleSave = async () => {
         setIsLoading(true);
         try {
@@ -67,7 +103,9 @@ export const Profile: React.FC = () => {
             updateUser({
                 businessName: formData.businessName,
                 ownerName: formData.ownerName,
-                logo: formData.logo
+                logo: formData.logo,
+                isVerified: formData.isVerified,
+                status: formData.status
             });
 
             alert('Profile updated successfully!');
@@ -92,17 +130,25 @@ export const Profile: React.FC = () => {
 
     return (
         <div className="max-w-6xl mx-auto space-y-8 pb-20">
+            {/* Hidden Inputs */}
+            <input
+                type="file"
+                ref={logoInputRef}
+                className="hidden"
+                accept="image/*"
+                onChange={(e) => e.target.files?.[0] && handleImageUpload('logo', e.target.files[0])}
+            />
+
             {/* Header / Cover Section */}
             <div className="relative group">
-                <div className="h-64 md:h-80 w-full rounded-3xl bg-gradient-to-br from-orange-400 via-red-500 to-pink-600 overflow-hidden shadow-xl relative">
-                    <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20"></div>
-                    <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-all duration-500"></div>
-
-                    <div className="absolute bottom-6 right-6 opacity-0 group-hover:opacity-100 transition-opacity duration-300 transform translate-y-2 group-hover:translate-y-0">
-                        <Button variant="secondary" className="!bg-white/90 hover:!bg-white text-gray-800 shadow-lg backdrop-blur-md border-0">
-                            <Camera size={18} className="mr-2" /> Change Cover
-                        </Button>
-                    </div>
+                <div className="h-64 md:h-80 w-full rounded-3xl bg-gray-900 overflow-hidden shadow-xl relative">
+                    {/* Fixed High-Quality Marketplace Image */}
+                    <img
+                        src="https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=2000&auto=format&fit=crop"
+                        alt="Marketplace Banner"
+                        className="absolute inset-0 w-full h-full object-cover opacity-80"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20"></div>
                 </div>
 
                 {/* Profile Avatar & Quick Info Layer */}
@@ -114,17 +160,25 @@ export const Profile: React.FC = () => {
                                 alt="Profile"
                                 className="w-full h-full object-cover"
                             />
-                            <div className="absolute inset-0 bg-black/30 opacity-0 group-hover/avatar:opacity-100 transition-opacity duration-300 flex items-center justify-center cursor-pointer">
+                            <div
+                                className="absolute inset-0 bg-black/30 opacity-0 group-hover/avatar:opacity-100 transition-opacity duration-300 flex items-center justify-center cursor-pointer"
+                                onClick={() => logoInputRef.current?.click()}
+                            >
                                 <Camera className="text-white drop-shadow-md" size={32} />
                             </div>
+                            {uploading.logo && (
+                                <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-20">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+                                </div>
+                            )}
                         </div>
                     </div>
 
                     <div className="flex-1 pb-4 text-center md:text-left">
                         <h1 className="text-3xl md:text-4xl font-bold text-gray-900 drop-shadow-sm">{formData.businessName}</h1>
                         <p className="text-gray-500 font-medium text-lg flex items-center justify-center md:justify-start gap-2 mt-1">
-                            <span className="w-2 h-2 rounded-full bg-green-500 inline-block"></span>
-                            Verified Vendor
+                            <span className={`w-2 h-2 rounded-full inline-block ${(formData.isVerified || formData.status?.toUpperCase() === 'APPROVED' || formData.status?.toLowerCase() === 'active') ? 'bg-green-500' : 'bg-orange-500'}`}></span>
+                            {(formData.isVerified || formData.status?.toUpperCase() === 'APPROVED' || formData.status?.toLowerCase() === 'active') ? 'Verified Vendor' : 'Unverified Vendor'}
                             <span className="text-gray-300 mx-1">|</span>
                             {formData.ownerName}
                         </p>

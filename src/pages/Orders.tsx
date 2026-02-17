@@ -22,12 +22,30 @@ export const Orders: React.FC = () => {
         setIsLoading(true);
         try {
             const data = await orderService.getOrders(page, 20, statusFilter);
-            setOrders(data.orders);
+
+            // Fetch validation to get customer details since list API might miss them
+            const ordersWithDetails = await Promise.all(
+                data.orders.map(async (order) => {
+                    try {
+                        const detailedOrder = await orderService.getOrder(order._id);
+                        return {
+                            ...order,
+                            shippingAddress: detailedOrder.shippingAddress,
+                            customerName: detailedOrder.customerName || detailedOrder.shippingAddress?.fullName
+                        };
+                    } catch (err) {
+                        console.error(`Failed to fetch details for order ${order._id}`, err);
+                        return order;
+                    }
+                })
+            );
+
+            setOrders(ordersWithDetails);
             setTotalPages(data.pages);
         } catch (error) {
             console.error('Failed to fetch orders', error);
         } finally {
-            setIsLoading(false);
+            setIsLoading(false); // Ensure loading state is reset
         }
     };
 
@@ -45,6 +63,8 @@ export const Orders: React.FC = () => {
             case 'CANCELLED': return 'bg-red-100 text-red-700';
             default: return 'bg-gray-100 text-gray-700';
         }
+
+        
     };
 
     const filteredOrders = orders.filter(order => {
@@ -88,12 +108,9 @@ export const Orders: React.FC = () => {
                         className="w-full px-4 py-3.5 rounded-xl border border-gray-200 bg-gray-50 text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-orange-100 focus:border-orange-200 transition-all cursor-pointer appearance-none"
                     >
                         <option value="ALL">All Status</option>
-                        <option value="PLACED">Placed</option>
-                        <option value="PENDING">Pending</option>
                         <option value="PROCESSING">Processing</option>
                         <option value="SHIPPED">Shipped</option>
                         <option value="DELIVERED">Delivered</option>
-                        <option value="CANCELLED">Cancelled</option>
                     </select>
                 </div>
             </div>
@@ -141,7 +158,7 @@ export const Orders: React.FC = () => {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-sm text-gray-600">
-                                            {order.customerName || `Customer ${order.customerId?.substring(0, 6) || 'N/A'}`}
+                                            {order.customerName || order.shippingAddress?.fullName || `Customer ${order.customerId?.substring(0, 6) || 'N/A'}`}
                                         </td>
                                         <td className="px-6 py-4">
                                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium capitalize border ${order.paymentStatus === 'COMPLETED' ? 'bg-green-50 text-green-700 border-green-100' :

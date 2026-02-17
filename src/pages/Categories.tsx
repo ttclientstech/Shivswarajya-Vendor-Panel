@@ -6,6 +6,7 @@ import { Select } from '../components/ui/Select';
 import { FileUpload } from '../components/ui/FileUpload';
 import { ImageWithFallback } from '../components/ui/ImageWithFallback';
 import { productService, type Product, type Category } from '../services/productService';
+import { fileUploadService } from '../services/fileUploadService';
 // Using Product type from service
 
 
@@ -50,9 +51,34 @@ export const Categories: React.FC = () => {
 
     const fetchCategories = async () => {
         try {
-            const data = await productService.getCategories();
-            // Filter only active categories if needed, or show all
-            setCategories(data);
+            // Fetch categories and all vendor products in parallel to calculate counts
+            const [categoriesData, productsResponse] = await Promise.all([
+                productService.getCategories(),
+                productService.getProducts(1, 1000)
+            ]);
+
+            // Calculate product counts per category
+            const counts: Record<string, number> = {};
+            if (productsResponse.products) {
+                productsResponse.products.forEach((p) => {
+                    // Handle populate objects or direct IDs
+                    // Check p.category object first, then p.categoryId (which might also be populated)
+                    const catId = p.category?._id ||
+                        (typeof p.categoryId === 'object' && p.categoryId !== null ? (p.categoryId as any)._id : p.categoryId);
+
+                    if (catId) {
+                        counts[catId] = (counts[catId] || 0) + 1;
+                    }
+                });
+                console.log('calculated vendor category counts:', counts);
+            }
+
+            const mapped = categoriesData.map(cat => ({
+                ...cat,
+                productCount: counts[cat._id] || 0
+            }));
+
+            setCategories(mapped);
         } catch (error) {
             console.error('Failed to fetch categories', error);
         }
@@ -123,8 +149,15 @@ export const Categories: React.FC = () => {
         setIsLoading(true);
 
         try {
-            // Upload images logic to be implemented
-            const imageUrls = ['https://placehold.co/600x400'];
+            // Upload images
+            const imageUrls = await Promise.all(
+                formData.images.map(file => fileUploadService.uploadFile(file))
+            );
+
+            // If no images uploaded, use placeholder (or handle as error if required)
+            if (imageUrls.length === 0) {
+                imageUrls.push('https://placehold.co/600x400');
+            }
 
             if (!selectedCategory) throw new Error("No category selected");
 
@@ -227,7 +260,7 @@ export const Categories: React.FC = () => {
         >
             <div className="aspect-[4/3] bg-gray-100 relative overflow-hidden">
                 <img
-                    src={product.images[0] || 'https://placehold.co/400'}
+                    src={(product.images && product.images.length > 0) ? product.images[0] : ((product as any).image || 'https://placehold.co/400')}
                     alt={product.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 />
@@ -273,6 +306,7 @@ export const Categories: React.FC = () => {
     const ProductDetailModal = ({ product, initialEditMode = false }: { product: Product, initialEditMode?: boolean }) => {
         const [isEditing, setIsEditing] = useState(initialEditMode);
         const [isSaving, setIsSaving] = useState(false);
+        const [isUploading, setIsUploading] = useState(false);
         const [editFormData, setEditFormData] = useState({
             name: product.name,
             description: product.description,
@@ -291,10 +325,26 @@ export const Categories: React.FC = () => {
             setEditFormData(prev => ({ ...prev, [name]: value }));
         };
 
-        const handleImageUpdate = (files: File[]) => {
-            // Mock image update
-            const newImageUrls = files.map(file => URL.createObjectURL(file));
-            setEditFormData(prev => ({ ...prev, images: [...prev.images, ...newImageUrls] }));
+        const handleImageUpdate = async (files: File[]) => {
+            if (!files.length) return;
+
+            setIsUploading(true);
+            try {
+                // Upload to Cloudinary
+                const newImageUrls = await Promise.all(
+                    files.map(file => fileUploadService.uploadFile(file))
+                );
+
+                setEditFormData(prev => ({
+                    ...prev,
+                    images: [...prev.images, ...newImageUrls]
+                }));
+            } catch (error) {
+                console.error("Failed to upload images", error);
+                alert("Failed to upload images. Please try again.");
+            } finally {
+                setIsUploading(false);
+            }
         };
 
         const handleRemoveImage = (indexToRemove: number) => {
@@ -305,6 +355,8 @@ export const Categories: React.FC = () => {
         };
 
         const handleSave = async () => {
+            if (isUploading) return;
+
             setIsSaving(true);
             try {
                 // 1. Prepare general update data (exclude isActive)
@@ -388,6 +440,7 @@ export const Categories: React.FC = () => {
                                         multiple={true}
                                         onFilesSelect={handleImageUpdate}
                                         placeholder="Upload new image"
+                                        isLoading={isUploading}
                                     />
                                 </div>
                             )}
@@ -421,7 +474,7 @@ export const Categories: React.FC = () => {
                                 ) : (
                                     <div className="flex gap-2">
                                         <Button variant="ghost" onClick={() => setIsEditing(false)} className="text-gray-500">Cancel</Button>
-                                        <Button onClick={handleSave} isLoading={isSaving} className="bg-orange-600 text-white">Save</Button>
+                                        <Button onClick={handleSave} isLoading={isSaving} disabled={isUploading} className="bg-orange-600 text-white">Save</Button>
                                     </div>
                                 )}
                             </div>

@@ -8,6 +8,9 @@ interface User {
     businessName?: string;
     ownerName?: string;
     logo?: string;
+    coverImage?: string;
+    isVerified?: boolean;
+    status?: string;
 }
 
 interface AuthContextType {
@@ -29,7 +32,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     useEffect(() => {
         // Check for persisted auth state on mount
         const storedAuth = localStorage.getItem('vendor_auth');
-        if (storedAuth) {
+        const token = localStorage.getItem('vendor_token');
+
+        if (storedAuth && token) {
             try {
                 const userData = JSON.parse(storedAuth);
                 setUser({ ...userData, role: 'vendor' });
@@ -37,7 +42,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             } catch (error) {
                 console.error("Failed to parse auth storage", error);
                 localStorage.removeItem('vendor_auth');
+                localStorage.removeItem('vendor_token');
             }
+        } else {
+            // Clean up if partial data exists
+            localStorage.removeItem('vendor_auth');
+            localStorage.removeItem('vendor_token');
+            setIsAuthenticated(false);
         }
         setIsLoading(false);
     }, []);

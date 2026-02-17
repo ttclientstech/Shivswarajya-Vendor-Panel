@@ -51,20 +51,138 @@ export const Onboarding: React.FC = () => {
         license: null as File | string | null, // Can be File object or URL string
     });
 
+    // Validation Errors State
+    const [errors, setErrors] = useState<{ [key: string]: string }>({});
+
+    // Validation Functions
+    const validateLegalShopName = (value: string): string => {
+        if (!value.trim()) return 'Shop name is required';
+        if (value.trim().length < 3) return 'Shop name must be at least 3 characters';
+        if (value.trim().length > 100) return 'Shop name must not exceed 100 characters';
+        return '';
+    };
+
+    const validateOwnerName = (value: string): string => {
+        if (!value.trim()) return 'Owner name is required';
+        if (value.trim().length < 3) return 'Owner name must be at least 3 characters';
+        if (value.trim().length > 50) return 'Owner name must not exceed 50 characters';
+        if (!/^[a-zA-Z\s]+$/.test(value)) return 'Owner name should contain only letters and spaces';
+        return '';
+    };
+
+    const validateBusinessCategory = (value: string): string => {
+        if (!value) return 'Please select a business category';
+        return '';
+    };
+
+    const validateBusinessId = (value: string): string => {
+        if (!value.trim()) return 'Business ID/GSTIN is required';
+        // GSTIN format: 15 characters alphanumeric
+        const gstinRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+        if (value.length === 15) {
+            if (!gstinRegex.test(value)) return 'Invalid GSTIN format';
+        } else {
+            // General business ID: 5-20 alphanumeric characters
+            if (value.length < 5) return 'Business ID must be at least 5 characters';
+            if (value.length > 20) return 'Business ID must not exceed 20 characters';
+            if (!/^[a-zA-Z0-9]+$/.test(value)) return 'Business ID should be alphanumeric';
+        }
+        return '';
+    };
+
+    const validateMobile = (value: string): string => {
+        if (!value.trim()) return 'Mobile number is required';
+        const cleanedValue = value.replace(/\s+/g, '').replace(/^\+91/, '');
+        if (!/^\d{10}$/.test(cleanedValue)) return 'Mobile number must be exactly 10 digits';
+        return '';
+    };
+
+    const validateAddress = (value: string): string => {
+        if (!value.trim()) return 'Address is required';
+        if (value.trim().length < 10) return 'Address must be at least 10 characters';
+        return '';
+    };
+
+    const validateCity = (value: string): string => {
+        if (!value.trim()) return 'City is required';
+        if (value.trim().length < 2) return 'City name must be at least 2 characters';
+        if (value.trim().length > 50) return 'City name must not exceed 50 characters';
+        if (!/^[a-zA-Z\s]+$/.test(value)) return 'City name should contain only letters and spaces';
+        return '';
+    };
+
+    const validatePincode = (value: string): string => {
+        if (!value.trim()) return 'Pincode is required';
+        if (!/^\d{6}$/.test(value)) return 'Pincode must be exactly 6 digits';
+        return '';
+    };
+
+    const validateField = (field: string, value: string | File | null): string => {
+        switch (field) {
+            case 'legalShopName':
+                return validateLegalShopName(value as string);
+            case 'ownerName':
+                return validateOwnerName(value as string);
+            case 'businessCategory':
+                return validateBusinessCategory(value as string);
+            case 'businessId':
+                return validateBusinessId(value as string);
+            case 'mobile':
+                return validateMobile(value as string);
+            case 'address':
+                return validateAddress(value as string);
+            case 'city':
+                return validateCity(value as string);
+            case 'pincode':
+                return validatePincode(value as string);
+            default:
+                return '';
+        }
+    };
+
     const handleInputChange = (field: string, value: string | File | null) => {
         setFormData(prev => ({ ...prev, [field]: value }));
+        // Clear error when user starts typing
+        if (errors[field]) {
+            setErrors(prev => ({ ...prev, [field]: '' }));
+        }
+    };
+
+    const handleBlur = (field: string) => {
+        const value = formData[field as keyof typeof formData];
+        const error = validateField(field, value);
+        setErrors(prev => ({ ...prev, [field]: error }));
     };
 
     const handleFileUpload = async (field: string, file: File) => {
         if (!file) return;
 
+        // Validate file type
+        const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+        if (!allowedTypes.includes(file.type)) {
+            setErrors(prev => ({ ...prev, [field]: 'Only PDF, JPG, and PNG files are allowed' }));
+            return;
+        }
+
+        // Validate file size (5MB max)
+        const maxSize = 5 * 1024 * 1024; // 5MB in bytes
+        if (file.size > maxSize) {
+            setErrors(prev => ({ ...prev, [field]: 'File size must not exceed 5MB' }));
+            return;
+        }
+
+        // Clear any previous errors
+        setErrors(prev => ({ ...prev, [field]: '' }));
+
         setUploading(prev => ({ ...prev, [field]: true }));
         try {
+            console.log(`Starting upload for ${field}...`);
             const url = await fileUploadService.uploadFile(file);
+            console.log(`Upload successful for ${field}:`, url);
             handleInputChange(field, url); // Store URL directly in formData
         } catch (error) {
             console.error(`Failed to upload ${field} `, error);
-            alert('File upload failed. Please try again.');
+            setErrors(prev => ({ ...prev, [field]: 'File upload failed. Please try again.' }));
         } finally {
             setUploading(prev => ({ ...prev, [field]: false }));
         }
@@ -72,35 +190,45 @@ export const Onboarding: React.FC = () => {
 
     const isStepValid = () => {
         if (step === 1) {
-            return formData.legalShopName && formData.ownerName && formData.businessCategory && formData.businessId;
+            const hasAllFields = formData.legalShopName && formData.ownerName && formData.businessCategory && formData.businessId;
+            const hasNoErrors = !errors.legalShopName && !errors.ownerName && !errors.businessCategory && !errors.businessId;
+            return hasAllFields && hasNoErrors;
         }
         if (step === 2) {
-            return formData.mobile && formData.address && formData.city && formData.pincode;
+            const hasAllFields = formData.mobile && formData.address && formData.city && formData.pincode;
+            const hasNoErrors = !errors.mobile && !errors.address && !errors.city && !errors.pincode;
+            return hasAllFields && hasNoErrors;
         }
         if (step === 3) {
             // In a real app, we'd check if URLs are present. 
             // For now, checks if files are selected or URLs are set (if we had them)
             // Since handleInputChange now stores URLs for file fields, check truthiness
-            return formData.idProof && formData.license;
+            const hasAllFiles = formData.idProof && formData.license;
+            const hasNoErrors = !errors.idProof && !errors.license;
+            return hasAllFiles && hasNoErrors;
         }
         return false;
     };
 
+    const isUploading = Object.values(uploading).some(Boolean);
+
     const handleNext = () => {
-        if (isStepValid()) {
+        if (isStepValid() && !isUploading) {
             setStep(prev => prev + 1);
             window.scrollTo(0, 0);
         }
     };
 
     const handleBack = () => {
-        setStep(prev => prev - 1);
-        window.scrollTo(0, 0);
+        if (!isUploading) {
+            setStep(prev => prev - 1);
+            window.scrollTo(0, 0);
+        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!isStepValid()) return;
+        if (!isStepValid() || isUploading) return;
 
         setIsLoading(true);
         try {
@@ -117,12 +245,12 @@ export const Onboarding: React.FC = () => {
                     pincode: formData.pincode
                 },
                 description: `Category: ${formData.businessCategory} `,
-                // Assuming handleFileUpload has updated these with URLs. 
-                // If they are File objects (not uploaded), this might fail if backend expects strings.
-                // But simplified flow assumes upload happens or we pass placeholder/blob URLs.
-                shopActLicenseUrl: formData.license instanceof File ? URL.createObjectURL(formData.license) : (formData.license as string),
-                identityProofUrl: formData.idProof instanceof File ? URL.createObjectURL(formData.idProof) : (formData.idProof as string)
+                // Ensure these are strings (URLs) from Cloudinary
+                shopActLicenseUrl: formData.license as string,
+                identityProofUrl: formData.idProof as string
             };
+
+            console.log('Submitting onboarding payload:', payload);
 
             try {
                 await profileService.setupProfile(payload);
@@ -225,9 +353,11 @@ export const Onboarding: React.FC = () => {
                                 <div className="grid grid-cols-1 gap-6">
                                     <Input
                                         label="Legal Shop Name"
-                                        placeholder="e.g. Omkar Electronics"
+                                        placeholder="Shop Name"
                                         value={formData.legalShopName}
                                         onChange={(e) => handleInputChange('legalShopName', e.target.value)}
+                                        onBlur={() => handleBlur('legalShopName')}
+                                        error={errors.legalShopName}
                                         required
                                         icon={<Store size={18} />}
                                     />
@@ -236,6 +366,8 @@ export const Onboarding: React.FC = () => {
                                         placeholder="Full name as per PAN"
                                         value={formData.ownerName}
                                         onChange={(e) => handleInputChange('ownerName', e.target.value)}
+                                        onBlur={() => handleBlur('ownerName')}
+                                        error={errors.ownerName}
                                         required
                                     />
                                 </div>
@@ -245,6 +377,8 @@ export const Onboarding: React.FC = () => {
                                         options={BUSINESS_CATEGORIES}
                                         value={formData.businessCategory}
                                         onChange={(e) => handleInputChange('businessCategory', e.target.value)}
+                                        onBlur={() => handleBlur('businessCategory')}
+                                        error={errors.businessCategory}
                                         required
                                     />
                                     <Input
@@ -252,6 +386,8 @@ export const Onboarding: React.FC = () => {
                                         placeholder="GSTIN or Shop Act No."
                                         value={formData.businessId}
                                         onChange={(e) => handleInputChange('businessId', e.target.value)}
+                                        onBlur={() => handleBlur('businessId')}
+                                        error={errors.businessId}
                                         required
                                     />
                                 </div>
@@ -266,6 +402,8 @@ export const Onboarding: React.FC = () => {
                                         placeholder="+91 00000 00000"
                                         value={formData.mobile}
                                         onChange={(e) => handleInputChange('mobile', e.target.value)}
+                                        onBlur={() => handleBlur('mobile')}
+                                        error={errors.mobile}
                                         required
                                         type="tel"
                                     />
@@ -276,6 +414,8 @@ export const Onboarding: React.FC = () => {
                                     placeholder="Building, Street, Area"
                                     value={formData.address}
                                     onChange={(e) => handleInputChange('address', e.target.value)}
+                                    onBlur={() => handleBlur('address')}
+                                    error={errors.address}
                                     required
                                     icon={<MapPin size={18} />}
                                 />
@@ -285,6 +425,8 @@ export const Onboarding: React.FC = () => {
                                         placeholder="Mumbai"
                                         value={formData.city}
                                         onChange={(e) => handleInputChange('city', e.target.value)}
+                                        onBlur={() => handleBlur('city')}
+                                        error={errors.city}
                                         required
                                     />
                                     <Input
@@ -293,6 +435,8 @@ export const Onboarding: React.FC = () => {
                                         maxLength={6}
                                         value={formData.pincode}
                                         onChange={(e) => handleInputChange('pincode', e.target.value)}
+                                        onBlur={() => handleBlur('pincode')}
+                                        error={errors.pincode}
                                         required
                                     />
                                 </div>
@@ -314,6 +458,7 @@ export const Onboarding: React.FC = () => {
                                         onFilesSelect={(files) => handleFileUpload('idProof', files[0])}
                                         isLoading={uploading.idProof}
                                         uploadedFileName={typeof formData.idProof === 'string' ? formData.idProof.split('/').pop() : formData.idProof?.name}
+                                        error={errors.idProof}
                                     />
                                     <FileUpload
                                         label="Business License"
@@ -321,6 +466,7 @@ export const Onboarding: React.FC = () => {
                                         onFilesSelect={(files) => handleFileUpload('license', files[0])}
                                         isLoading={uploading.license}
                                         uploadedFileName={typeof formData.license === 'string' ? formData.license.split('/').pop() : formData.license?.name}
+                                        error={errors.license}
                                     />
                                 </div>
                             </div>
@@ -332,7 +478,7 @@ export const Onboarding: React.FC = () => {
                                     type="button"
                                     variant="ghost"
                                     onClick={handleBack}
-                                    disabled={isLoading}
+                                    disabled={isLoading || isUploading}
                                     className="!w-auto text-gray-500 hover:text-gray-900"
                                 >
                                     <ArrowLeft size={18} className="mr-2" /> Back
@@ -344,7 +490,7 @@ export const Onboarding: React.FC = () => {
                                     <Button
                                         type="button"
                                         onClick={handleNext}
-                                        disabled={!isStepValid()}
+                                        disabled={!isStepValid() || isUploading}
                                         className="!w-auto px-8 bg-black hover:bg-zinc-800 text-white"
                                     >
                                         Next Step <ArrowRight size={18} className="ml-2" />
@@ -353,7 +499,7 @@ export const Onboarding: React.FC = () => {
                                     <Button
                                         type="submit"
                                         isLoading={isLoading}
-                                        disabled={!isStepValid()}
+                                        disabled={!isStepValid() || isUploading}
                                         className="!w-auto px-8 bg-orange-600 hover:bg-orange-700 text-white"
                                     >
                                         Complete Setup <Save size={18} className="ml-2" />
@@ -367,4 +513,5 @@ export const Onboarding: React.FC = () => {
         </div>
     );
 };
+
 

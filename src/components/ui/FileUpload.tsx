@@ -9,6 +9,7 @@ interface FileUploadProps {
     multiple?: boolean;
     isLoading?: boolean;
     uploadedFileName?: string;
+    error?: string;
 }
 
 export const FileUpload: React.FC<FileUploadProps> = ({
@@ -18,7 +19,8 @@ export const FileUpload: React.FC<FileUploadProps> = ({
     placeholder,
     multiple = false,
     isLoading = false,
-    uploadedFileName
+    uploadedFileName,
+    error
 }) => {
     const [files, setFiles] = useState<File[]>([]);
     const [isDragging, setIsDragging] = useState(false);
@@ -76,9 +78,11 @@ export const FileUpload: React.FC<FileUploadProps> = ({
                     border-2 border-dashed rounded-xl p-8
                     flex flex-col items-center justify-center text-center
                     transition-all duration-300 ease-out
-                    ${isDragging
-                        ? 'border-orange-500 bg-orange-50 scale-[1.02] shadow-xl shadow-orange-500/10'
-                        : 'border-gray-200 bg-gray-50/50 hover:bg-white hover:border-orange-400 hover:shadow-lg hover:shadow-orange-500/5'
+                    ${error
+                        ? 'border-red-500 bg-red-50/50'
+                        : isDragging
+                            ? 'border-orange-500 bg-orange-50 scale-[1.02] shadow-xl shadow-orange-500/10'
+                            : 'border-gray-200 bg-gray-50/50 hover:bg-white hover:border-orange-400 hover:shadow-lg hover:shadow-orange-500/5'
                     }
                     ${isLoading ? 'opacity-70 pointer-events-none' : ''}
                 `}
@@ -104,10 +108,12 @@ export const FileUpload: React.FC<FileUploadProps> = ({
                     ) : (
                         <div className={`
                             p-4 rounded-full transition-all duration-300
-                            ${isDragging
-                                ? 'bg-orange-100 text-orange-600 scale-110'
-                                : 'bg-white shadow-sm ring-1 ring-gray-100 text-gray-400 group-hover:text-orange-500 group-hover:scale-110 group-hover:ring-orange-100'}
-                        `}>
+                            ${error
+                                ? 'bg-red-100 text-red-600'
+                                : isDragging
+                                    ? 'bg-orange-100 text-orange-600 scale-110'
+                                    : 'bg-white shadow-sm ring-1 ring-gray-100 text-gray-400 group-hover:text-orange-500 group-hover:scale-110 group-hover:ring-orange-100'}`}
+                        >
                             <Upload size={32} strokeWidth={1.5} />
                         </div>
                     )}
@@ -122,6 +128,13 @@ export const FileUpload: React.FC<FileUploadProps> = ({
                     </div>
                 </div>
             </div>
+
+            {/* Error Message */}
+            {error && (
+                <p className="text-sm text-red-600 ml-1 flex items-center gap-1 mt-2">
+                    <span className="text-red-500">⚠</span> {error}
+                </p>
+            )}
 
             {/* File List - Show either local files OR externally provided filename (e.g. after upload) */}
             {(files.length > 0 || uploadedFileName) && (

@@ -6,8 +6,7 @@ interface RequestOptions extends RequestInit {
 
 export const apiClient = {
     request: async <T>(endpoint: string, options: RequestOptions = {}): Promise<T> => {
-        // const token = localStorage.getItem('vendor_token');
-        const token = '2'; // Hardcoded token for testing vendor access
+        const token = localStorage.getItem('vendor_token');
 
         const defaultHeaders: Record<string, string> = {
             'Content-Type': 'application/json',
@@ -27,9 +26,11 @@ export const apiClient = {
 
             // Handle 401 Unauthorized globally if needed (e.g., redirect to login)
             if (response.status === 401) {
-                // Optionally emit an event or clear token
-                // localStorage.removeItem('vendor_token');
-                // window.location.href = '/login';
+                localStorage.removeItem('vendor_token');
+                localStorage.removeItem('vendor_auth');
+                window.location.href = '/login';
+                // Stop further execution
+                throw new Error('Session expired. Please login again.');
             }
 
             const data = await response.json();

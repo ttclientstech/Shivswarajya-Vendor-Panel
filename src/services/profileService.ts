@@ -15,10 +15,12 @@ export interface VendorProfile {
     };
     description?: string;
     logo?: string;
+    coverImage?: string;
     shopActLicenseUrl: string;
     identityProofUrl: string;
     isVerified: boolean;
     isActive: boolean;
+    status: string;
 }
 
 export const profileService = {

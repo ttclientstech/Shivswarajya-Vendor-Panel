@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { financialGrowthData } from '../data/mockData';
-import { IndianRupee, Users, Package, AlertTriangle } from 'lucide-react';
+
+import { IndianRupee, Users, Package, AlertTriangle, X } from 'lucide-react';
 import { productService, type Product } from '../services/productService';
 import { orderService } from '../services/orderService';
 import {
@@ -28,23 +28,51 @@ export const Dashboard = () => {
     const [monthlyRevenueData, setMonthlyRevenueData] = useState<{ name: string; revenue: number }[]>([]);
     const [timeRange, setTimeRange] = useState<'WEEKLY' | 'MONTHLY'>('WEEKLY');
     const [categoryData, setCategoryData] = useState<{ name: string; value: number }[]>([]);
+    const [categoryMap, setCategoryMap] = useState<Record<string, string>>({});
+    const [allProducts, setAllProducts] = useState<Product[]>([]);
+    const [allOrders, setAllOrders] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [modalConfig, setModalConfig] = useState<{
+        isOpen: boolean;
+        type: 'PRODUCTS' | 'ORDERS' | 'LOW_STOCK' | null;
+        title: string;
+        data: any[];
+    }>({ isOpen: false, type: null, title: '', data: [] });
 
     useEffect(() => {
         const fetchDashboardData = async () => {
             try {
-                // Fetch Products
-                const productsResponse = await productService.getProducts(1, 100);
+                // Fetch Products and Categories in parallel
+                const [productsResponse, categoriesData] = await Promise.all([
+                    productService.getProducts(1, 1000), // Fetch more to get better distribution
+                    productService.getCategories()
+                ]);
+
                 const products = productsResponse.products || [];
+                setAllProducts(products); // Save for modal
+
+                // Create Category ID -> Name map
+                const catMap: Record<string, string> = {};
+                categoriesData.forEach((cat: any) => {
+                    catMap[cat._id] = cat.name;
+                    catMap[cat.id] = cat.name;
+                });
+                setCategoryMap(catMap); // Save for modal
 
                 // Calculate Product Stats
                 const totalProducts = productsResponse.total || 0;
-                const lowStockCount = products.filter((p: Product) => p.stock < 10).length;
+                const lowStockCount = products.filter((p: Product) => p.stock < 5).length;
 
                 // Calculate Category Split
                 const categoryCount: { [key: string]: number } = {};
                 products.forEach((p: Product) => {
-                    const catName = p.category?.name || 'Uncategorized';
+                    // Try to get category ID from populated object or direct ID
+                    const catId = p.category?._id ||
+                        (typeof p.categoryId === 'object' && p.categoryId !== null ? (p.categoryId as any)._id : p.categoryId);
+
+                    // Get name from map or use populated name if available, fallback to Uncategorized
+                    const catName = catMap[catId] || p.category?.name || 'Uncategorized';
+
                     categoryCount[catName] = (categoryCount[catName] || 0) + 1;
                 });
 
@@ -57,8 +85,28 @@ export const Dashboard = () => {
 
                 // Fetch Orders
                 const ordersResponse = await orderService.getOrders(1, 100);
-                console.log("Order API Response:", ordersResponse); // Debugging Log
+                // console.log("Order API Response:", ordersResponse); // Debugging Log
                 const orders = ordersResponse.orders || [];
+
+                // Process recent orders for display (Fetch details for top 10)
+                const recentOrdersRaw = orders.slice(0, 10);
+                const ordersWithDetails = await Promise.all(
+                    recentOrdersRaw.map(async (order) => {
+                        try {
+                            const detailedOrder = await orderService.getOrder(order._id);
+                            return {
+                                ...order,
+                                shippingAddress: detailedOrder.shippingAddress,
+                                customerName: detailedOrder.customerName || detailedOrder.shippingAddress?.fullName
+                            };
+                        } catch (err) {
+                            console.error(`Failed to fetch details for order ${order._id}`, err);
+                            return order;
+                        }
+                    })
+                );
+                setAllOrders(ordersWithDetails); // Save for modal (Detailed 10)
+
                 const totalOrders = ordersResponse.total || 0;
 
                 // Calculate Revenue (Sum of totalAmount from fetched orders)
@@ -134,6 +182,24 @@ export const Dashboard = () => {
         fetchDashboardData();
     }, []);
 
+    const handleCardClick = (type: 'PRODUCTS' | 'ORDERS' | 'LOW_STOCK') => {
+        let data = [];
+        let title = '';
+
+        if (type === 'LOW_STOCK') {
+            title = 'Low Stock Products (Less than 5)';
+            data = allProducts.filter(p => p.stock < 5);
+        } else if (type === 'PRODUCTS') {
+            title = 'All Products';
+            data = allProducts;
+        } else if (type === 'ORDERS') {
+            title = 'Recent Orders';
+            data = allOrders;
+        }
+
+        setModalConfig({ isOpen: true, type, title, data });
+    };
+
     const statCards = [
         {
             label: 'TOTAL REVENUE',
@@ -141,7 +207,8 @@ export const Dashboard = () => {
             growth: '+12%', // hardcoded for now as we lack historical data
             icon: IndianRupee,
             iconBg: 'bg-orange-100',
-            iconColor: 'text-orange-600'
+            iconColor: 'text-orange-600',
+            onClick: null
         },
         {
             label: 'TOTAL PRODUCTS', // Changed from Active Vendors
@@ -149,7 +216,8 @@ export const Dashboard = () => {
             growth: '+5%',
             icon: Package, // Changed icon to Package
             iconBg: 'bg-blue-100',
-            iconColor: 'text-blue-600'
+            iconColor: 'text-blue-600',
+            onClick: () => handleCardClick('PRODUCTS')
         },
         {
             label: 'TOTAL ORDERS',
@@ -157,7 +225,8 @@ export const Dashboard = () => {
             growth: '+8%',
             icon: Users, // Kept Users icon but could be ShoppingBag
             iconBg: 'bg-green-100',
-            iconColor: 'text-green-600'
+            iconColor: 'text-green-600',
+            onClick: () => handleCardClick('ORDERS')
         },
         {
             label: 'LOW STOCK PRODUCTS',
@@ -165,7 +234,8 @@ export const Dashboard = () => {
             growth: stats.lowStockProducts > 0 ? '-2%' : '+0%', // Dynamic direction if needed
             icon: AlertTriangle,
             iconBg: 'bg-purple-100',
-            iconColor: 'text-purple-600'
+            iconColor: 'text-purple-600',
+            onClick: () => handleCardClick('LOW_STOCK')
         },
     ];
 
@@ -178,7 +248,11 @@ export const Dashboard = () => {
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {statCards.map((stat, index) => (
-                    <div key={index} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                    <div
+                        key={index}
+                        onClick={stat.onClick ? stat.onClick : undefined}
+                        className={`bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all ${stat.onClick ? 'cursor-pointer active:scale-95' : ''}`}
+                    >
                         <div className="flex justify-between items-start mb-4">
                             <div className={`p-3 rounded-xl ${stat.iconBg}`}>
                                 <stat.icon className={stat.iconColor} size={24} />
@@ -194,6 +268,110 @@ export const Dashboard = () => {
                     </div>
                 ))}
             </div>
+
+            {/* Detail Modal */}
+            {modalConfig.isOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn">
+                    <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+                        {/* Header */}
+                        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                            <h2 className="text-xl font-bold text-gray-900">{modalConfig.title}</h2>
+                            <button
+                                onClick={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}
+                                className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500"
+                            >
+                                <X size={20} /> {/* Assuming X is imported from lucide-react */}
+                            </button>
+                        </div>
+
+                        {/* Body */}
+                        <div className="p-0 overflow-y-auto custom-scrollbar">
+                            {modalConfig.data.length === 0 ? (
+                                <div className="p-12 text-center text-gray-500">No data found.</div>
+                            ) : (
+                                <table className="w-full text-left border-collapse">
+                                    <thead className="bg-gray-50 sticky top-0 z-10">
+                                        <tr>
+                                            {modalConfig.type === 'ORDERS' ? (
+                                                <>
+                                                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Order ID</th>
+                                                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
+                                                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Customer</th>
+                                                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Amount</th>
+                                                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Product</th>
+                                                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Category</th>
+                                                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Price</th>
+                                                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Stock</th>
+                                                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                                                </>
+                                            )}
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-50">
+                                        {modalConfig.data.map((item, idx) => (
+                                            <tr key={idx} className="hover:bg-gray-50/50 transition-colors">
+                                                {modalConfig.type === 'ORDERS' ? (
+                                                    <>
+                                                        <td className="px-6 py-4 font-medium text-gray-900">#{item.orderNumber}</td>
+                                                        <td className="px-6 py-4 text-sm text-gray-500">{new Date(item.createdAt).toLocaleDateString()}</td>
+                                                        <td className="px-6 py-4 text-sm text-gray-500">{item.customerName || item.shippingAddress?.fullName || 'N/A'}</td>
+                                                        <td className="px-6 py-4 font-bold text-gray-900">₹{item.totalAmount}</td>
+                                                        <td className="px-6 py-4">
+                                                            <span className={`px-2 py-1 text-[10px] font-bold rounded-full uppercase tracking-wide
+                                                                ${item.orderStatus === 'DELIVERED' ? 'bg-green-100 text-green-700' :
+                                                                    item.orderStatus === 'CANCELLED' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
+                                                                {item.orderStatus}
+                                                            </span>
+                                                        </td>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <td className="px-6 py-4">
+                                                            <div className="flex items-center gap-3">
+                                                                <img
+                                                                    src={item.images?.[0] || 'https://placehold.co/100'}
+                                                                    alt=""
+                                                                    className="w-10 h-10 rounded-lg object-cover bg-gray-100"
+                                                                />
+                                                                <div className="font-medium text-gray-900 line-clamp-1">{item.name}</div>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-sm text-gray-500">
+                                                            {/* Resolve Category Name */}
+                                                            {(() => {
+                                                                const catId = item.category?._id ||
+                                                                    (typeof item.categoryId === 'object' ? item.categoryId._id : item.categoryId);
+                                                                return categoryMap[catId] || item.category?.name || 'Uncategorized';
+                                                            })()}
+                                                        </td>
+                                                        <td className="px-6 py-4 font-medium text-gray-900">₹{item.price}</td>
+                                                        <td className="px-6 py-4">
+                                                            <span className={`font-bold ${item.stock < 5 ? 'text-red-600' : 'text-gray-900'}`}>
+                                                                {item.stock}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-6 py-4">
+                                                            <span className={`px-2 py-1 text-[10px] font-bold rounded-full uppercase tracking-wide
+                                                                ${item.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
+                                                                {item.isActive ? 'Active' : 'Draft'}
+                                                            </span>
+                                                        </td>
+                                                    </>
+                                                )}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
 
             {/* Charts Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

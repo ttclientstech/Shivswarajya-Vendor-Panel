@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { Onboarding } from './pages/Onboarding';
@@ -11,8 +12,25 @@ import { OrderDetail } from './pages/OrderDetail';
 import { Layout } from './components/Layout';
 import { AuthProvider } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { MobileDisclaimer } from './components/MobileDisclaimer';
 
 function App() {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 1280);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  if (isMobile) {
+    return <MobileDisclaimer />;
+  }
+
   return (
     <AuthProvider>
       <Router>

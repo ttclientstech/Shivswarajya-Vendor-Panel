@@ -1,11 +1,12 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShieldCheck, Mail, ArrowRight, Shield, Zap, Globe, Chrome } from 'lucide-react';
+import { Mail, ArrowRight, Shield, Zap, Globe, Chrome } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/authService';
 import styles from './Login.module.css';
+import shivswarajyaLogo from '/images/logofinal.png';
 
 export const Login: React.FC = () => {
     const navigate = useNavigate();
@@ -92,7 +93,7 @@ export const Login: React.FC = () => {
                 <div className={styles.contentWrapper}>
                     <div className={styles.brandHeader}>
                         <div className={styles.logoContainer}>
-                            <ShieldCheck size={32} />
+                            <img src={shivswarajyaLogo} alt="Shivswarajya Logo" className={styles.logoImage} />
                         </div>
                         <h1 className={styles.title}>
                             SHIVSWARAJYA <br />
@@ -106,18 +107,18 @@ export const Login: React.FC = () => {
                     <div className={styles.formCard}>
                         {step === 'email' ? (
                             <>
-                                <Button
+                                {/* <Button
                                     variant="outline"
                                     fullWidth
                                     icon={<Chrome size={20} />}
                                     onClick={handleGoogleLogin}
                                 >
                                     Login with Google
-                                </Button>
+                                </Button> */}
 
                                 <div className={styles.divider}>
                                     <span className={styles.line}></span>
-                                    <span>OR LOGIN WITH EMAIL</span>
+                                    <span>VENDOR ACCESS</span>
                                     <span className={styles.line}></span>
                                 </div>
 
@@ -130,7 +131,7 @@ export const Login: React.FC = () => {
                                         onChange={(e) => setEmail(e.target.value)}
                                         required
                                     />
-                                    <br></br>
+                                   
                                     {error && <p className="text-red-500 text-sm text-center">{error}</p>}
                                     <Button
                                         type="submit"
@@ -198,10 +199,10 @@ export const Login: React.FC = () => {
 
             {/* Right Side - Visuals */}
             <section className={styles.visualSection}>
-                <div className={styles.systemStatus}>
+                {/* <div className={styles.systemStatus}>
                     <span className={styles.statusDot}></span>
                     SYSTEMS NOMINAL
-                </div>
+                </div> */}
 
                 <div className={styles.visualContent}>
                     <h2 className={styles.visualTitle}>

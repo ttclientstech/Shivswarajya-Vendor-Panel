@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, MapPin, Mail, Package, CheckCircle, AlertCircle, Calendar, Hash } from 'lucide-react';
 import { orderService, type VendorOrder } from '../services/orderService';
+import { productService } from '../services/productService';
 import { Button } from '../components/ui/Button';
 import { Select } from '../components/ui/Select';
 
@@ -21,7 +22,43 @@ export const OrderDetail: React.FC = () => {
     const fetchOrder = async (id: string) => {
         try {
             const data = await orderService.getOrder(id);
-            setOrder(data);
+
+            // Enrich items with images if missing
+            const enrichedItems = await Promise.all(data.items.map(async (item) => {
+                // 1. Try common field names on the item itself
+                let image = item.image ||
+                    (item as any).images?.[0] ||
+                    (item as any).productImage ||
+                    (item as any).thumbnail ||
+                    (item as any).imageUrl ||
+                    (item as any).img;
+
+                // 2. Check if productId is an object (populated product)
+                if (!image && item.productId && typeof item.productId === 'object') {
+                    const prodObj = item.productId as any;
+                    image = prodObj.images?.[0] || prodObj.image || prodObj.productImage || prodObj.thumbnail;
+                }
+
+                // 3. Fallback to fetching product details if we have a string ID
+                if (!image && item.productId && typeof item.productId === 'string') {
+                    try {
+                        const product = await productService.getProduct(item.productId);
+                        image = (product.images && product.images.length > 0) ? product.images[0] : (product as any).image;
+                    } catch (err) {
+                        console.error(`Failed to fetch product details for ${item.productId}:`, err);
+                    }
+                }
+
+                // 4. One last check for any nested product object (sometimes patterns vary)
+                if (!image && (item as any).product && typeof (item as any).product === 'object') {
+                    const prodObj = (item as any).product;
+                    image = prodObj.images?.[0] || prodObj.image || prodObj.imageUrl;
+                }
+
+                return { ...item, image };
+            }));
+
+            setOrder({ ...data, items: enrichedItems });
         } catch (error) {
             console.error('Failed to fetch order details', error);
         } finally {
@@ -29,25 +66,32 @@ export const OrderDetail: React.FC = () => {
         }
     };
 
-    const handleStatusUpdate = async (productId: string, newStatus: string) => {
+    const handleStatusUpdate = async (productId: any, newStatus: string) => {
         if (!order || !orderId) return;
 
-        setUpdatingItemId(productId);
+        // Ensure we use the string ID if productId is an object (populated)
+        const targetProductId = typeof productId === 'object' ? (productId?._id || productId?.id || productId) : productId;
+
+        setUpdatingItemId(targetProductId);
+        const previousOrder = { ...order };
+
         try {
-            // Optimistic update
-            const updatedItems = order.items.map(item =>
-                item.productId === productId ? { ...item, status: newStatus as any } : item
-            );
+            // Optimistic update - compare string IDs
+            const updatedItems = order.items.map(item => {
+                const itemProdId = typeof item.productId === 'object' ? (item.productId as any)?._id || (item.productId as any)?.id : item.productId;
+                return itemProdId === targetProductId ? { ...item, status: newStatus as any } : item;
+            });
             setOrder({ ...order, items: updatedItems });
 
-            await orderService.updateOrderItemStatus(orderId, productId, newStatus);
-            // Re-fetch to ensure sync (optional)
-            // fetchOrder(orderId); 
-        } catch (error) {
+            await orderService.updateOrderItemStatus(orderId, targetProductId, newStatus);
+
+            // Always fetch the fresh order details to ensure we have the source of truth
+            await fetchOrder(orderId);
+        } catch (error: any) {
             console.error('Failed to update status', error);
-            alert('Failed to update order status');
+            alert(`Failed to update order status: ${error.message || 'Unknown error'}`);
             // Revert changes
-            fetchOrder(orderId);
+            setOrder(previousOrder);
         } finally {
             setUpdatingItemId(null);
         }
@@ -118,8 +162,9 @@ export const OrderDetail: React.FC = () => {
                                         {item.image ? (
                                             <img src={item.image} alt={item.productName} className="w-full h-full object-cover" />
                                         ) : (
-                                            <div className="flex items-center justify-center h-full text-gray-400">
-                                                <Package size={24} />
+                                            <div className="flex flex-col items-center justify-center h-full bg-gray-50 text-gray-400 p-2 text-center">
+                                                <Package size={24} className="mb-1" />
+                                                <span className="text-[10px] leading-tight px-1 font-medium">Image Not Found</span>
                                             </div>
                                         )}
                                     </div>
@@ -141,7 +186,11 @@ export const OrderDetail: React.FC = () => {
                                                 <Select
                                                     value={item.status}
                                                     onChange={(e) => handleStatusUpdate(item.productId, e.target.value)}
-                                                    disabled={item.status === 'DELIVERED' || item.status === 'CANCELLED' || updatingItemId === item.productId}
+                                                    disabled={
+                                                        item.status === 'DELIVERED' || 
+                                                        item.status === 'CANCELLED' || 
+                                                        updatingItemId === (typeof item.productId === 'object' ? (item.productId as any)?._id || (item.productId as any)?.id : item.productId)
+                                                    }
                                                     options={[
                                                         { value: 'PROCESSING', label: 'Processing' },
                                                         { value: 'SHIPPED', label: 'Shipped' },
