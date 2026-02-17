@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, ArrowRight, Shield, Zap, Globe, Chrome } from 'lucide-react';
+import { Mail, ArrowRight, Shield, Zap, Globe } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { useAuth } from '../context/AuthContext';
@@ -82,9 +82,6 @@ export const Login: React.FC = () => {
         }
     };
 
-    const handleGoogleLogin = () => {
-        console.log("Google Login Clicked");
-    };
 
     return (
         <div className={styles.page}>
@@ -131,7 +128,7 @@ export const Login: React.FC = () => {
                                         onChange={(e) => setEmail(e.target.value)}
                                         required
                                     />
-                                   
+
                                     {error && <p className="text-red-500 text-sm text-center">{error}</p>}
                                     <Button
                                         type="submit"
