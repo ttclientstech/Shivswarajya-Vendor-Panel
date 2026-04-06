@@ -4,6 +4,7 @@ import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { Onboarding } from './pages/Onboarding';
 import { Profile } from './pages/Profile';
+import { Maintenance } from './pages/Maintenance';
 
 import { Categories } from './pages/Categories';
 import { Orders } from './pages/Orders';
@@ -16,6 +17,7 @@ import { MobileDisclaimer } from './components/MobileDisclaimer';
 
 function App() {
   const [isMobile, setIsMobile] = useState(false);
+  const isMaintenanceMode = true; // Set to true to enable maintenance mode
 
   useEffect(() => {
     const checkMobile = () => {
@@ -26,6 +28,16 @@ function App() {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  if (isMaintenanceMode) {
+    return (
+      <Router>
+        <Routes>
+          <Route path="*" element={<Maintenance />} />
+        </Routes>
+      </Router>
+    );
+  }
 
   if (isMobile) {
     return <MobileDisclaimer />;
